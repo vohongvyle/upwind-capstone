@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Upwind · Air Pollution Tracker</title>
+  <meta name="description" content="Upwind shows where Southern California's air pollution comes from, where it is heading, and when it is safe to be outside." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1014'/%3E%3Cpath d='M6 21c4-6 8-6 10-2s6 4 10-2' stroke='%235eead4' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='21' r='2.6' fill='%235eead4'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="map" class="map" aria-label="Air quality map"></div>
+
+  <!-- Brand + current time -->
+  <header class="brand card">
+    <div class="brand-row">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 21c4-6 8-6 10.5-2s6.5 4 11-2" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round"/><circle cx="5" cy="21" r="2.8" fill="currentColor"/></svg>
+      <div>
+        <h1 id="app-name">Upwind</h1>
+        <p class="tag" data-i18n="tagline">Where your air is coming from</p>
+        <div class="brand-ctl">
+          <div id="regions" class="seg" role="group" aria-label="Region"></div>
+          <div id="langs" class="seg" role="group" aria-label="Language">
+            <button data-lang="en" aria-pressed="true">EN</button>
+            <button data-lang="es" aria-pressed="false">ES</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="now">
+      <div id="now-time" class="now-time">—</div>
+      <span id="now-badge" class="badge">…</span>
+    </div>
+  </header>
+
+  <!-- Layer chips + toggles -->
+  <nav class="layers card" aria-label="Map layers">
+    <div id="chips" class="chips" role="radiogroup" aria-label="Pollutant shown on map"></div>
+    <div class="sep" aria-hidden="true"></div>
+    <div class="toggles">
+      <button class="toggle on" data-toggle="wind"><span class="dot"></span><span data-i18n="wind">Wind</span></button>
+      <button class="toggle on" data-toggle="path"><span class="dot"></span><span data-i18n="path">Path</span></button>
+      <button class="toggle on" data-toggle="contours"><span class="dot"></span><span data-i18n="isolines">Isolines</span></button>
+      <button class="toggle"    data-toggle="grid"><span class="dot"></span><span data-i18n="grid">Grid</span></button>
+    </div>
+  </nav>
+
+  <!-- Detail panel -->
+  <aside id="panel" class="panel card" aria-live="polite">
+    <button id="sheet-handle" class="sheet-handle" aria-label="Expand details"></button>
+    <div class="panel-scroll">
+      <section class="p-head">
+        <div>
+          <div id="p-kicker" class="kicker">—</div>
+          <h2 id="p-title">—</h2>
+          <div id="p-sub" class="sub">—</div>
+        </div>
+        <button id="p-close" class="icon-btn" hidden data-i18n-aria="back" data-i18n-title="back">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </section>
+
+      <!-- My places -->
+      <section class="places">
+        <button id="btn-locate" class="pill pill-accent">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="currentColor"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="7" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>
+          <span data-i18n="myLocation">My location</span>
+        </button>
+        <button id="btn-save" class="pill" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>
+          <span data-i18n="save">Save place</span>
+        </button>
+        <div id="saved" class="saved"></div>
+        <div id="place-msg" class="place-msg" hidden></div>
+      </section>
+
+      <div id="alert" class="alert" role="status"></div>
+
+      <section class="hero">
+        <div class="hero-num"><span id="p-aqi" class="num">—</span><span class="unit">US AQI</span></div>
+        <div class="hero-meta">
+          <span id="p-cat" class="cat">—</span>
+          <div id="p-dom" class="dom">—</div>
+        </div>
+      </section>
+      <div class="scale" aria-hidden="true"><div class="scale-bar"></div><div id="p-marker" class="scale-marker"></div></div>
+      <p id="p-advice" class="advice">—</p>
+
+      <!-- Best time outside -->
+      <section class="best">
+        <h3><span data-i18n="bestTitle">Best time to be outside</span>
+          <label class="profile"><span data-i18n="profile">For</span>
+            <select id="profile">
+              <option value="general" data-i18n="p_general">Everyone</option>
+              <option value="sensitive" data-i18n="p_sensitive">Asthma, kids, seniors, pregnancy</option>
+              <option value="outdoor" data-i18n="p_outdoor">Outdoor workers</option>
+            </select>
+          </label>
+        </h3>
+        <div id="slots" class="slots"></div>
+        <p id="best-text" class="best-text">—</p>
+        <p id="tip" class="tip">—</p>
+      </section>
+
+      <section>
+        <h3><span data-i18n="pollutants">Pollutants</span> <span class="hint" data-i18n="pollutantsHint">sub-index · concentration</span></h3>
+        <div id="p-pollutants" class="pollutants"></div>
+      </section>
+
+      <section class="row2">
+        <div class="mini">
+          <h3 data-i18n="wind">Wind</h3>
+          <div class="wind">
+            <svg id="p-wind-arrow" class="wind-arrow" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18.5" fill="none" stroke="currentColor" stroke-opacity=".18"/><path d="M20 7l6 14h-4.5v12h-3V21H14z" fill="currentColor"/></svg>
+            <div><div id="p-wind" class="wind-val">—</div><div id="p-wind-dir" class="sub">—</div></div>
+          </div>
+        </div>
+        <div class="mini">
+          <h3 data-i18n="worstCell">Worst cell</h3>
+          <div id="p-worst" class="worst">—</div>
+          <div id="p-worst-sub" class="sub">—</div>
+        </div>
+      </section>
+
+      <section>
+        <h3><span data-i18n="aqiOverTime">AQI over time</span> <span id="chart-scope" class="hint">—</span></h3>
+        <div id="chart" class="chart"></div>
+      </section>
+
+      <section id="traj" class="traj">
+        <h3 data-i18n="pollutionPath">Pollution path</h3>
+        <div id="traj-body" class="traj-body">—</div>
+      </section>
+
+      <footer class="p-foot">
+        <p id="p-note" class="note"></p>
+        <nav id="links" class="links"></nav>
+      </footer>
+    </div>
+  </aside>
+
+  <!-- Legend -->
+  <div id="legend" class="legend card" aria-label="Legend"></div>
+
+  <!-- Timeline -->
+  <section class="timeline card" aria-label="Timeline">
+    <div class="tl-controls">
+      <button id="tl-prev" class="icon-btn" aria-label="Previous slot" title="←"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="tl-play" class="play" aria-label="Play" title="Space">
+        <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>
+        <svg class="i-pause" viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>
+      </button>
+      <button id="tl-next" class="icon-btn" aria-label="Next slot" title="→"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="tl-speed" class="speed">1×</button>
+    </div>
+    <div id="tl-track" class="tl-track" role="slider" tabindex="0" aria-label="Time"></div>
+    <label class="tl-date">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2.5" stroke="currentColor" stroke-width="1.7" fill="none"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <input id="tl-date" type="date" aria-label="Date" />
+    </label>
+  </section>
+
+  <div class="basemap" role="group" aria-label="Basemap">
+    <button data-basemap="satellite" aria-pressed="true" data-i18n="satellite">Satellite</button>
+    <button data-basemap="dark" aria-pressed="false" data-i18n="dark">Dark</button>
+  </div>
+
+  <div class="zoom">
+    <button id="z-in" aria-label="Zoom in">+</button>
+    <button id="z-out" aria-label="Zoom out">−</button>
+    <button id="z-fit" aria-label="Fit region"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></button>
+  </div>
+
+  <div id="tooltip" class="tooltip" hidden></div>
+  <div class="attrib" id="attrib"></div>
+  <div id="loading" class="loading"><div class="spinner"></div><span data-i18n="loading">Loading boards…</span></div>
+
+  <script src="vendor/d3.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
