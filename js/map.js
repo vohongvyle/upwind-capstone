@@ -9,7 +9,7 @@ import { CONFIG } from './config.js';
 import { sample, cellAt, cr } from './data.js';
 import { aqiRamp, seqRamp } from './aqi.js';
 import { WindLayer } from './wind.js';
-import { t as tr } from './i18n.js';
+import { t as tr } from './strings.js';
 
 const FIELD_W = 520;              // field bitmap resolution (px across the grid)
 const FIELD_ALPHA_IN = 0.66;      // inside county
@@ -28,7 +28,7 @@ export class MapView {
     this.show = { wind: true, path: true, contours: true, grid: false };
     this.basemap = CONFIG.basemaps[CONFIG.defaultBasemap];
     this.path = null; this.hover = -1; this.selected = -1;
-    this.markers = []; this.me = null;   // saved places [{name,lon,lat}], my location [lon,lat]
+    this.markers = []; this.me = null; this.city = null;   // saved places [{name,lon,lat}], my location [lon,lat]
     this.contours = [];
     this.t0 = performance.now();
 
@@ -204,7 +204,8 @@ export class MapView {
     c.fill();
     const d = c.getImageData(0, 0, this.fw, this.fh).data;
     this.mask = new Float32Array(this.fw * this.fh);
-    for (let i = 0; i < this.mask.length; i++) this.mask[i] = d[i * 4 + 3] / 255;
+    const hasRings = this.county.rings.length > 0;   // city areas have no outline → whole grid is "inside"
+    for (let i = 0; i < this.mask.length; i++) this.mask[i] = hasRings ? d[i * 4 + 3] / 255 : 1;
     // precompute lon/lat for each pixel
     this.pxLon = new Float32Array(this.fw); this.pxLat = new Float32Array(this.fh);
     for (let x = 0; x < this.fw; x++) this.pxLon[x] = unproject(a[0] + (x + 0.5) / sx, a[1])[0];
@@ -355,7 +356,7 @@ export class MapView {
     // contours, clipped to the county
     if (this.show.contours && this.contours.length) {
       ctx.save();
-      ctx.beginPath(); this.county.rings.forEach(r => this.ringPath(ctx, r)); ctx.clip();
+      if (this.county.rings.length) { ctx.beginPath(); this.county.rings.forEach(r => this.ringPath(ctx, r)); ctx.clip(); }
       ctx.lineWidth = 1; ctx.setLineDash([]);
       for (const c of this.contours) {
         ctx.strokeStyle = `rgba(255,255,255,${c.value >= 150 ? 0.42 : 0.26})`;
@@ -374,7 +375,17 @@ export class MapView {
       ctx.restore();
     }
 
-    // county outline
+    // county outline (Kern) or city centre marker (city areas)
+    if (this.city && !this.county.rings.length) {
+      const [x, y] = this.toScreen(this.city.lon, this.city.lat);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, y, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.stroke();
+      ctx.font = '700 13px "IBM Plex Sans", system-ui, sans-serif'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(this.city.name, x + 10, y);
+      ctx.fillStyle = '#fff'; ctx.fillText(this.city.name, x + 10, y);
+      ctx.restore();
+    }
     ctx.save();
     ctx.beginPath(); this.county.rings.forEach(r => this.ringPath(ctx, r));
     ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 4; ctx.stroke();

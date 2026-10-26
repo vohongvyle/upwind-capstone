@@ -1,29 +1,33 @@
 // ─────────────────────────────────────────────────────────────
-//  Regions. Each region has its own board grid, data folders,
-//  outline(s), place names and demo model.
-//  Switch with ?region=<id> in the URL (the header buttons do this).
+//  Areas — California's most polluted metro areas
+//  (American Lung Association, "State of the Air" 2026,
+//   https://www.lung.org/media/press-releases/fy26-sota-california).
+//  Los Angeles–Long Beach (#1 ozone) is intentionally left out.
 //
-//  Outlines are APPROXIMATE hand-traced rings (~3–5 km). For exact
-//  borders drop official TIGER/Line GeoJSON at `outlineGeoJSON`.
+//  Each area has its own 0.25° board grid (aligned to the same
+//  lattice the backend already uses), data folders, place names,
+//  national ranks and a demo model. Switch with ?region=<id>.
 // ─────────────────────────────────────────────────────────────
 import { CONFIG } from './config.js';
 
 const range = (a, b, step = 0.25) => Array.from({ length: Math.round((b - a) / step) + 1 }, (_, i) => +(a + i * step).toFixed(4));
+const E = lon => +(lon + 360).toFixed(4);   // −119.5 → 240.5 (backend convention)
 
 export const REGIONS = {
   kern: {
     id: 'kern',
-    name: 'Kern County',
-    short: 'Kern',
-    tagline: 'Kern County air pollution tracker',
-    // board centres in the backend's 0–360 longitude convention
+    name: 'Bakersfield',
+    sub: 'Kern County',
+    center: [-119.019, 35.373],
+    // national rank: ozone, short-term particles, year-round particles (null = not ranked)
+    ranks: { ozone: 3, short: 3, annual: 1 },
+    headline: '#1 year-round particle pollution in the U.S.',
     grid: { lons: range(239.75, 242.25), lats: range(34.75, 35.75) },
-    outlines: [
-      { name: 'Kern', ring: [
-        [-120.194, 35.789], [-117.632, 35.796], [-117.652, 34.820], [-118.877, 34.820],
-        [-119.442, 34.901], [-119.475, 34.985], [-119.535, 35.090], [-119.555, 35.180],
-        [-119.760, 35.330], [-119.910, 35.440], [-120.030, 35.560], [-120.194, 35.789]] },
-    ],
+    // approximate county outline (replace with TIGER/Line GeoJSON, FIPS 06029)
+    outlines: [{ name: 'Kern', ring: [
+      [-120.194, 35.789], [-117.632, 35.796], [-117.652, 34.820], [-118.877, 34.820],
+      [-119.442, 34.901], [-119.475, 34.985], [-119.535, 35.090], [-119.555, 35.180],
+      [-119.760, 35.330], [-119.910, 35.440], [-120.030, 35.560], [-120.194, 35.789]] }],
     places: [
       ['Bakersfield', -119.019, 35.373], ['Delano', -119.247, 35.769], ['Wasco', -119.341, 35.594],
       ['Shafter', -119.272, 35.500], ['McFarland', -119.229, 35.678], ['Taft', -119.456, 35.143],
@@ -36,44 +40,86 @@ export const REGIONS = {
     ],
   },
 
-  laoc: {
-    id: 'laoc',
-    name: 'Los Angeles & Orange',
-    short: 'LA + Orange',
-    tagline: 'LA & Orange County air pollution tracker',
-    grid: { lons: range(241.0, 242.5), lats: range(33.5, 34.75) },
-    outlines: [
-      { name: 'Los Angeles', ring: [   // mainland only (Catalina / San Clemente islands omitted)
-        [-118.880, 34.820], [-117.650, 34.820], [-117.655, 34.400], [-117.680, 34.150], [-117.730, 34.020],
-        [-117.783, 33.946], [-117.980, 33.930], [-118.030, 33.870], [-118.090, 33.780], [-118.110, 33.752],
-        [-118.180, 33.760], [-118.250, 33.712], [-118.350, 33.728], [-118.420, 33.770], [-118.395, 33.845],
-        [-118.420, 33.960], [-118.480, 34.005], [-118.550, 34.040], [-118.700, 34.030], [-118.800, 34.010],
-        [-118.940, 34.042], [-118.860, 34.130], [-118.670, 34.240], [-118.630, 34.300], [-118.650, 34.420],
-        [-118.790, 34.580], [-118.880, 34.820]] },
-      { name: 'Orange', ring: [
-        [-117.783, 33.946], [-117.670, 33.880], [-117.530, 33.790], [-117.470, 33.700], [-117.412, 33.655],
-        [-117.470, 33.550], [-117.510, 33.505], [-117.597, 33.386], [-117.680, 33.460], [-117.720, 33.480],
-        [-117.790, 33.540], [-117.880, 33.600], [-117.950, 33.630], [-118.020, 33.670], [-118.090, 33.740],
-        [-118.110, 33.752], [-118.090, 33.780], [-118.030, 33.870], [-117.980, 33.930], [-117.783, 33.946]] },
-    ],
+  visalia: {
+    id: 'visalia',
+    name: 'Visalia',
+    sub: 'Tulare County',
+    center: [-119.292, 36.330],
+    ranks: { ozone: 2, short: 5, annual: 5 }, tie: ['annual'],
+    headline: '#2 worst ozone in the U.S.',
+    grid: { lons: range(E(-119.75), E(-118.75)), lats: range(35.75, 36.75) },
+    outlines: [],
     places: [
-      ['Downtown LA', -118.243, 34.052], ['Long Beach', -118.193, 33.770], ['Port of LA', -118.270, 33.735],
-      ['Santa Monica', -118.491, 34.019], ['Malibu', -118.780, 34.026], ['Pasadena', -118.144, 34.148],
-      ['Burbank', -118.309, 34.181], ['Glendale', -118.255, 34.142], ['Torrance', -118.341, 33.836],
-      ['Inglewood', -118.353, 33.962], ['LAX', -118.408, 33.942], ['Compton', -118.220, 33.896],
-      ['Downey', -118.133, 33.940], ['El Monte', -118.028, 34.069], ['West Covina', -117.939, 34.069],
-      ['Pomona', -117.750, 34.055], ['Santa Clarita', -118.542, 34.391], ['San Fernando', -118.439, 34.282],
-      ['Palmdale', -118.116, 34.579], ['Lancaster', -118.154, 34.698], ['Azusa', -117.907, 34.134],
-      ['Anaheim', -117.915, 33.836], ['Santa Ana', -117.868, 33.746], ['Irvine', -117.826, 33.684],
-      ['Fullerton', -117.925, 33.870], ['Garden Grove', -117.941, 33.774], ['Orange', -117.853, 33.788],
-      ['Huntington Beach', -117.999, 33.660], ['Newport Beach', -117.929, 33.619], ['Costa Mesa', -117.919, 33.641],
-      ['Mission Viejo', -117.672, 33.600], ['Laguna Beach', -117.783, 33.542], ['San Clemente', -117.612, 33.427],
-      ['Yorba Linda', -117.813, 33.889],
+      ['Visalia', -119.292, 36.330], ['Tulare', -119.347, 36.208], ['Hanford', -119.645, 36.327],
+      ['Porterville', -119.017, 36.065], ['Exeter', -119.142, 36.296], ['Lindsay', -119.088, 36.203],
+      ['Farmersville', -119.207, 36.297], ['Dinuba', -119.387, 36.543], ['Woodlake', -119.098, 36.414],
+      ['Lemoore', -119.783, 36.300], ['Corcoran', -119.560, 36.098], ['Kingsburg', -119.554, 36.514],
+      ['Three Rivers', -118.904, 36.439], ['Terra Bella', -119.044, 35.962], ['Pixley', -119.291, 35.969],
+      ['Earlimart', -119.271, 35.884], ['Springville', -118.818, 36.130],
+    ],
+  },
+
+  fresno: {
+    id: 'fresno',
+    name: 'Fresno',
+    sub: 'Fresno & Madera Counties',
+    center: [-119.787, 36.738],
+    ranks: { ozone: 5, short: 6, annual: 4 },
+    headline: 'Top 6 on all three pollution lists',
+    grid: { lons: range(E(-120.25), E(-119.25)), lats: range(36.25, 37.25) },
+    outlines: [],
+    places: [
+      ['Fresno', -119.787, 36.738], ['Clovis', -119.703, 36.825], ['Madera', -120.061, 36.961],
+      ['Sanger', -119.556, 36.708], ['Selma', -119.612, 36.571], ['Reedley', -119.450, 36.596],
+      ['Kerman', -120.060, 36.723], ['Fowler', -119.678, 36.630], ['Kingsburg', -119.554, 36.514],
+      ['Chowchilla', -120.260, 37.123], ['Friant', -119.709, 36.988], ['Mendota', -120.381, 36.754],
+      ['Oakhurst', -119.649, 37.328], ['Coarsegold', -119.701, 37.262], ['Hanford', -119.645, 36.327],
+      ['Lemoore', -119.783, 36.300], ['Biola', -120.016, 36.802], ['Caruthers', -119.833, 36.542],
+    ],
+  },
+
+  sandiego: {
+    id: 'sandiego',
+    name: 'San Diego',
+    sub: 'San Diego County',
+    center: [-117.161, 32.716],
+    ranks: { ozone: 7, short: null, annual: 5 }, tie: ['annual'],
+    headline: '#7 ozone · tied #5 year-round particles',
+    grid: { lons: range(E(-117.5), E(-116.5)), lats: range(32.5, 33.5) },
+    outlines: [],
+    places: [
+      ['Downtown San Diego', -117.161, 32.716], ['Barrio Logan', -117.140, 32.697], ['Chula Vista', -117.084, 32.640],
+      ['National City', -117.099, 32.678], ['Tijuana (MX)', -117.038, 32.515], ['Otay Mesa', -116.970, 32.560],
+      ['El Cajon', -116.962, 32.795], ['La Mesa', -117.023, 32.768], ['Santee', -116.974, 32.838],
+      ['La Jolla', -117.271, 32.833], ['Poway', -117.036, 32.963], ['Ramona', -116.868, 33.042],
+      ['Escondido', -117.087, 33.119], ['San Marcos', -117.166, 33.143], ['Carlsbad', -117.351, 33.158],
+      ['Oceanside', -117.379, 33.196], ['Alpine', -116.766, 32.835], ['Lakeside', -116.922, 32.857],
+    ],
+  },
+
+  elcentro: {
+    id: 'elcentro',
+    name: 'El Centro',
+    sub: 'Imperial County',
+    center: [-115.563, 32.792],
+    ranks: { ozone: 10, short: 14, annual: 21 },
+    headline: '#10 ozone · on all three lists',
+    grid: { lons: range(E(-116.0), E(-115.0)), lats: range(32.5, 33.5) },
+    outlines: [],
+    places: [
+      ['El Centro', -115.563, 32.792], ['Calexico', -115.499, 32.679], ['Mexicali (MX)', -115.468, 32.624],
+      ['Brawley', -115.530, 32.979], ['Imperial', -115.569, 32.848], ['Holtville', -115.380, 32.811],
+      ['Heber', -115.530, 32.731], ['Seeley', -115.691, 32.793], ['Westmorland', -115.621, 33.037],
+      ['Calipatria', -115.514, 33.126], ['Niland', -115.519, 33.240], ['Salton City', -115.956, 33.299],
+      ['Ocotillo', -116.003, 32.738], ['Salton Sea', -115.850, 33.330],
     ],
   },
 };
 
-/** Current region from ?region=…, merged with its data-folder settings from config.js. */
+/** Areas ordered worst-first (by best national rank on any list). */
+export const ORDER = ['kern', 'visalia', 'fresno', 'sandiego', 'elcentro'];
+
+/** Current area from ?region=…, merged with its data-folder settings from config.js. */
 export function currentRegion() {
   const id = new URLSearchParams(location.search).get('region');
   const key = REGIONS[id] ? id : CONFIG.defaultRegion;

@@ -1,4 +1,4 @@
-import * as I18N from './i18n.js';
+import * as I18N from './strings.js';
 // ─────────────────────────────────────────────────────────────
 //  Geography helpers: projection, county outline, places
 // ─────────────────────────────────────────────────────────────

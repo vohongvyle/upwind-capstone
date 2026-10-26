@@ -15,8 +15,11 @@ export const CONFIG = {
   // Grid ranges, outlines and place names live in js/regions.js.
   defaultRegion: 'kern',
   regions: {
-    kern: { archiveDir: 'board_archive2',      forecastDir: 'forecast',        outlineGeoJSON: 'data/kern.geojson' },
-    laoc: { archiveDir: 'la_oc/board_archive', forecastDir: 'la_oc/forecast',  outlineGeoJSON: 'data/la_oc.geojson' },
+    kern:     { archiveDir: 'board_archive2',              forecastDir: 'forecast',                   outlineGeoJSON: 'data/kern.geojson' },
+    visalia:  { archiveDir: 'cities/visalia/board_archive',  forecastDir: 'cities/visalia/forecast',  outlineGeoJSON: 'data/visalia.geojson' },
+    fresno:   { archiveDir: 'cities/fresno/board_archive',   forecastDir: 'cities/fresno/forecast',   outlineGeoJSON: 'data/fresno.geojson' },
+    sandiego: { archiveDir: 'cities/sandiego/board_archive', forecastDir: 'cities/sandiego/forecast', outlineGeoJSON: 'data/sandiego.geojson' },
+    elcentro: { archiveDir: 'cities/elcentro/board_archive', forecastDir: 'cities/elcentro/forecast', outlineGeoJSON: 'data/elcentro.geojson' },
   },
 
   // The four 6-hour slots. `label` is what the UI shows, `start`/`end` build the filename.

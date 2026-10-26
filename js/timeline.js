@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import { mean } from './data.js';
 import { category } from './aqi.js';
-import { t as tr, fmtTime, locale } from './i18n.js';
+import { t as tr, fmtTime, locale } from './strings.js';
 
 export class Timeline {
   constructor(el, ds, { onScrub, onRelease }) {

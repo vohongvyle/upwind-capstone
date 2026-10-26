@@ -4,9 +4,9 @@
 import { CONFIG } from './config.js';
 import { loadDataset, blendAt, cellAt } from './data.js';
 import { loadCounty, setPlaces, describePlace } from './geo.js';
-import { t, LANG, setLang, applyStatic, fmtTime, pollLong } from './i18n.js';
+import { t, applyStatic, fmtTime, pollLong } from './strings.js';
 import { getPlaces, savePlace, removePlace, setProfile } from './foryou.js';
-import { REGIONS, currentRegion } from './regions.js';
+import { REGIONS, ORDER, currentRegion } from './regions.js';
 import { POLLUTANTS } from './aqi.js';
 import { MapView } from './map.js';
 import { Panel, renderLegend, renderTooltip } from './panel.js';
@@ -24,15 +24,7 @@ async function init() {
   document.title = `${CONFIG.appName} · ${region.name}`;
   $('app-name').textContent = CONFIG.appName;
   $('map').setAttribute('aria-label', `${region.name} — air quality map`);
-  $('regions').innerHTML = Object.values(REGIONS).map(r =>
-    `<button data-region="${r.id}" aria-pressed="${r.id === region.id}">${r.short}</button>`).join('');
-  $('regions').addEventListener('click', e => {
-    const id = e.target.closest('[data-region]')?.dataset.region;
-    if (!id || id === region.id) return;
-    const u = new URL(location.href); u.searchParams.set('region', id);
-    $('loading').classList.remove('done');
-    location.href = u.toString();
-  });
+  buildCityPicker(region);
 
   let ds;
   try {
@@ -126,15 +118,7 @@ async function init() {
   $('links').innerHTML = CONFIG.links.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('');
   state.approx = county.approximate;
 
-  // ── language ──
-  const syncLang = () => document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === LANG)));
-  document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => {
-    setLang(b.dataset.lang); syncLang();
-    document.querySelectorAll('.chip').forEach(c => { const p = POLLUTANTS.find(p => p.key === c.dataset.key); c.title = pollLong(p.key, p.long); });
-    renderLegend(state.layer, state.maxNo); state.tl.draw(); state.tl.set(state.t);
-    renderSaved(); renderAll();
-  }));
-  syncLang();
+  map.city = { name: region.name, lon: region.center[0], lat: region.center[1] };
 
   // ── for you: profile, my location, saved places ──
   $('profile').addEventListener('change', e => { setProfile(e.target.value); renderAll(); });
@@ -193,6 +177,33 @@ function toggle(name) {
   m.show[name] = !m.show[name];
   document.querySelector(`[data-toggle="${name}"]`).classList.toggle('on', m.show[name]);
   if (name === 'wind' && m.show.wind) m.wind.clear();
+}
+
+// ── city picker (most polluted metro areas) ────────────────
+const rankTxt = (r, k) => (r.ranks[k] == null ? '—' : `#${r.ranks[k]}${r.tie?.includes(k) ? '*' : ''}`);
+function buildCityPicker(region) {
+  const btn = $('city-btn'), menu = $('city-menu');
+  $('city-name').textContent = region.name;
+  $('city-sub').textContent = region.sub;
+  menu.innerHTML = `<div class="cm-h">${t('pickCity')}</div>` + ORDER.map(id => {
+    const r = REGIONS[id];
+    return `<button role="menuitemradio" aria-checked="${id === region.id}" data-region="${id}">
+      <span class="cm-name">${r.name}<small>${r.sub}</small></span>
+      <span class="cm-ranks"><span title="${t('rankOzone')}">O₃ ${rankTxt(r, 'ozone')}</span><span title="${t('rankShort')}">PM ${rankTxt(r, 'short')}</span><span title="${t('rankAnnual')}">PM/yr ${rankTxt(r, 'annual')}</span></span>
+    </button>`;
+  }).join('') + `<div class="cm-f">${t('rankSource')} * tie.</div>`;
+  const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  btn.addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); });
+  document.addEventListener('click', e => { if (!menu.contains(e.target)) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  menu.addEventListener('click', e => {
+    const id = e.target.closest('[data-region]')?.dataset.region;
+    if (!id) return;
+    if (id === region.id) { close(); return; }
+    const u = new URL(location.href); u.searchParams.set('region', id);
+    $('loading').classList.remove('done');
+    location.href = u.toString();
+  });
 }
 
 function select(cell, name = null, lonlat = null) {

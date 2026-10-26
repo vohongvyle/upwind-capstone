@@ -21,12 +21,12 @@
       <div>
         <h1 id="app-name">Upwind</h1>
         <p class="tag" data-i18n="tagline">Where your air is coming from</p>
-        <div class="brand-ctl">
-          <div id="regions" class="seg" role="group" aria-label="Region"></div>
-          <div id="langs" class="seg" role="group" aria-label="Language">
-            <button data-lang="en" aria-pressed="true">EN</button>
-            <button data-lang="es" aria-pressed="false">ES</button>
-          </div>
+        <div class="city">
+          <button id="city-btn" class="city-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="city-menu">
+            <span id="city-name" class="city-name">—</span><span id="city-sub" class="city-sub"></span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div id="city-menu" class="city-menu card" role="menu" hidden></div>
         </div>
       </div>
     </div>
@@ -103,6 +103,11 @@
         <div id="slots" class="slots"></div>
         <p id="best-text" class="best-text">—</p>
         <p id="tip" class="tip">—</p>
+      </section>
+
+      <section id="why" class="why">
+        <h3><span data-i18n="whyHere">Why this city</span> <span class="hint">State of the Air 2026</span></h3>
+        <div id="why-body"></div>
       </section>
 
       <section>

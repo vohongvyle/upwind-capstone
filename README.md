@@ -1,93 +1,79 @@
-# Upwind — "Không khí của bạn đến từ đâu"
+# Upwind — where your air is coming from
 
-*(trước đây là Borealis)*. Muốn đổi tên thì sửa `appName` trong `js/config.js` và thẻ `<title>` trong `index.html`.
+A static web front-end for the Borealis capstone backend. It shows air pollution across California's most polluted metro areas, traces where that pollution came from, and tells people when it's safe to be outside.
 
-## Tính năng cho người dùng
+There is no build step and no API key. The only dependency is **D3 v7**, which ships in `vendor/`.
 
-| Tính năng | Mô tả |
-|---|---|
-| **Mi ubicación / My location** | Lấy vị trí GPS rồi chọn ô grid tương ứng. Nếu người dùng ở ngoài vùng của khu vực đang xem, app sẽ báo cho họ biết. |
-| **Lưu địa điểm** | Lưu tối đa 6 nơi cho mỗi khu vực, như nhà hay trường của con, vào `localStorage`. Lần sau mở app sẽ vào thẳng địa điểm đầu tiên trong danh sách. |
-| **Cảnh báo ô nhiễm đang tới** | Dựa vào 4 mốc forecast trong 24 giờ tới cùng trajectory của từng mốc. Nếu AQI ở chỗ người dùng sẽ vượt ngưỡng (hoặc tăng từ 20 trở lên) và path đi qua trong phạm vi khoảng 1.5 ô, app hiện *"Pollution is heading your way (origin: …)"*. Nếu không có path đi qua thì hiện "Air will get worse". |
-| **Mấy giờ ra ngoài được** | Hiển thị 5 mốc (bây giờ và 24 giờ tới), mỗi mốc ghi Good, Limit hoặc Avoid theo hồ sơ sức khoẻ, đánh dấu khung giờ tốt nhất và kèm lời khuyên. Bấm vào một mốc là map nhảy tới thời điểm đó. |
-| **Hồ sơ sức khoẻ** | Có 3 lựa chọn: Everyone, Asthma/kids/seniors/pregnancy, Outdoor workers. Mỗi hồ sơ có ngưỡng riêng: nhóm nhạy cảm bị cảnh báo khi AQI trên 100, còn người bình thường khi trên 150. |
-| **EN / ES** | Toàn bộ giao diện có tiếng Anh và tiếng Tây Ban Nha, tên mức AQI dùng theo thuật ngữ của EPA và AirNow. App tự chọn theo ngôn ngữ của trình duyệt, hoặc mở bằng `?lang=es`. |
-
-Ngưỡng của từng hồ sơ nằm trong `PROFILES` ở `js/foryou.js`. Toàn bộ chữ trên giao diện nằm trong `js/i18n.js`.
-
-Bản viết lại toàn bộ frontend. Chạy tĩnh trên web: không có bước build và không cần API key. Chỉ phụ thuộc vào **D3 v7** (đã kèm trong `vendor/`).
-
-## Chạy thử
+## Run locally
 
 ```bash
 cd upwind
-python3 -m http.server 8000
-# mở http://localhost:8000
+python3 -m http.server 8000      # then open http://localhost:8000
 ```
 
-> Code dùng ES modules nên phải mở qua HTTP. Mở trực tiếp bằng `file://` sẽ không chạy.
+The code uses ES modules, so open it over HTTP. Opening `index.html` as a `file://` page won't work.
 
-Nếu không tìm thấy file board nào, app tự chuyển sang **demo data**. Demo data có cùng format với backend và trên badge hiện chữ "Demo".
+If no board files are found, the app switches to **demo data** in the same format as the backend, and the header badge says "Demo".
 
-## Deploy lên Athena / Artemis
+## Areas: California's most polluted cities
 
-Copy cả thư mục vào `public_html/`, đặt **cạnh** 2 thư mục dữ liệu đang có:
+Rankings come from the American Lung Association's *State of the Air 2026* report ([CA press release](https://www.lung.org/media/press-releases/fy26-sota-california)). Each number is the area's rank among all U.S. metro areas. Los Angeles–Long Beach (#1 for ozone) is intentionally left out.
 
-```
-public_html/
-├── index.html  css/  js/  vendor/  data/
-├── board_archive2/   board_2025-05-01_1200-1800.json, evaluation_2025-05-01_1200-1800.csv, ...
-└── forecast/         board_2025-05-02_0000-0600.json, ...
-```
+| Area (`?region=`) | Ozone | Short-term PM | Year-round PM | Grid centres (0–360 lon) | Data folders |
+|---|---|---|---|---|---|
+| Bakersfield / Kern (`kern`) | #3 | #3 | **#1** | lon 239.75–242.25, lat 34.75–35.75 (11×5) | `board_archive2/`, `forecast/` |
+| Visalia (`visalia`) | **#2** | #5 | #5 (tie) | lon 240.25–241.25, lat 35.75–36.75 (5×5) | `cities/visalia/…` |
+| Fresno (`fresno`) | #5 | #6 | #4 | lon 239.75–240.75, lat 36.25–37.25 (5×5) | `cities/fresno/…` |
+| San Diego (`sandiego`) | #7 | — | #5 (tie) | lon 242.5–243.5, lat 32.5–33.5 (5×5) | `cities/sandiego/…` |
+| El Centro (`elcentro`) | #10 | #14 | #21 | lon 244.0–245.0, lat 32.5–33.5 (5×5) | `cities/elcentro/…` |
 
-## Khu vực (Kern · LA + Orange)
+**Backend:** run the existing pipeline (OpenWeather, Aurora, pathfinder) with each area's lat/lon range from the table. Write the output to `cities/<id>/board_archive/` and `cities/<id>/forecast/`, using the same file names as Kern. All grids sit on the same 0.25° lattice the backend already uses.
 
-Nút chọn khu vực nằm ở góc trên bên trái. Cũng có thể mở thẳng bằng link `?region=kern` hoặc `?region=laoc`.
-Mỗi khu vực có grid, thư mục dữ liệu, ranh giới và danh sách địa danh riêng (xem `js/regions.js`).
+To add or remove an area, edit `REGIONS` and `ORDER` in `js/regions.js` and `regions` in `js/config.js`.
 
-| Khu vực | Grid (tâm ô, kinh độ 0–360) | Số ô | Thư mục dữ liệu |
-|---|---|---|---|
-| Kern | lon 239.75–242.25, lat 34.75–35.75, bước 0.25° | 11×5 | `board_archive2/`, `forecast/` |
-| LA + Orange | lon 241.0–242.5, lat 33.5–34.75, bước 0.25° | 7×6 | `la_oc/board_archive/`, `la_oc/forecast/` |
+## Features
 
-**Bên backend:** chạy lại pipeline hiện tại (gồm OpenWeather, Aurora, pathfinder) với dải lat/lon của LA + Orange ở bảng trên, rồi ghi kết quả vào `la_oc/...`. Tên file giữ nguyên như Kern. Pipeline không cần sửa gì khác vì paper đã ghi là dải toạ độ có thể đổi được.
-Ranh giới chính thức (TIGER/Line, FIPS 06037 cho LA và 06059 cho Orange) đặt vào `data/la_oc.geojson`. Nếu không có file này, app dùng outline gần đúng, chỉ có phần đất liền và không có đảo Catalina.
-Muốn thêm khu vực khác thì thêm một mục vào `REGIONS` trong `js/regions.js` và một mục vào `CONFIG.regions`.
+- **City picker** (top left) — every area with its three national ranks; the panel's *Why this city* card explains the ranking.
+- **My location** — finds you by GPS and jumps to your grid cell. It tells you if you're outside the area on screen.
+- **Saved places** — up to 6 per area, kept in `localStorage`. The app opens straight to the first saved place.
+- **Incoming-pollution alert** — reads the next 24 h of forecast boards and their trajectories. When AQI at your spot gets meaningfully worse and the predicted path passes nearby, it shows *"Pollution is heading your way (origin: …)"*.
+- **Best time outside** — the next five 6-hour slots rated Good / Limit / Avoid for your health profile (Everyone, Sensitive groups, Outdoor workers), with a short tip.
+- Smooth AQI field, wind particles, animated pollution path, timeline with playback, satellite or dark basemap.
 
-## Kết nối với backend: chỉ cần sửa `js/config.js`
+## Configuration (`js/config.js`)
 
-| Key | Ý nghĩa |
+| Key | What it does |
 |---|---|
-| `regions.<id>.archiveDir/forecastDir` | Thư mục board quan trắc và board dự báo của từng khu vực |
-| `boardFile(date, slot)` | Tên file board, mặc định `board_YYYY-MM-DD_HHMM-HHMM.json` |
-| `evalFile(date, slot)` | Tên file trajectory. **Sửa cho đúng tên file backend đang ghi ra.** Nhận CSV (cột `lon`,`lat`, dòng đầu là origin) hoặc JSON |
-| `slots` | 4 khung 6 giờ. `label` là chữ hiển thị trên UI, `start`/`end` dùng để ghép tên file |
-| `daysBack`, `forecastDays`, `endDate` | Số ngày cần load. `endDate: null` = hôm nay |
-| `regions.<id>.outlineGeoJSON` | Đường dẫn GeoJSON ranh giới chính thức. Nếu không có, app dùng outline gần đúng |
-| `basemaps`, `defaultBasemap` | Nền vệ tinh (Esri) hoặc nền tối (CARTO). `dim` là độ làm tối ảnh, `fieldAlpha` là độ đậm lớp AQI |
-| `links` | Link About team / Source code / Paper / Poster |
+| `appName` | Name shown in the header and the browser tab |
+| `regions.<id>` | Data folders and optional official outline GeoJSON for each area |
+| `boardFile`, `evalFile` | File-name patterns. **Set `evalFile` to whatever your trajectory files are actually called** |
+| `slots` | The four 6-hour slots |
+| `daysBack`, `forecastDays`, `endDate` | How much history and forecast to load |
+| `basemaps`, `defaultBasemap` | Satellite (Esri) or dark (CARTO) basemap; `dim` and `fieldAlpha` control contrast |
+| `links` | Links in the panel footer |
 
-Format board được đọc đúng như Figure 6 trong paper: `board[].center`, `weather["10u_wind_change"|"10v_wind_change"]`, `pollution.avg.{co,no,no2,o3,so2,pm2_5,pm10}`. Kinh độ kiểu 0–360 (239.75) được tự đổi sang −120.25. Nếu board có sẵn key `path` / `origin` thì app dùng luôn và không cần file CSV.
+Health-profile thresholds are in `PROFILES` in `js/foryou.js`. All UI wording is in `js/strings.js`.
 
-## Cấu trúc code
+## Code map
 
 ```
-js/config.js    cấu hình (chỉ cần sửa file này)
-js/foryou.js    hồ sơ sức khoẻ, địa điểm đã lưu, giờ tốt nhất, cảnh báo
-js/i18n.js      chữ tiếng Anh / Tây Ban Nha
-js/store.js     localStorage an toàn (có fallback khi bị chặn)
-js/regions.js   grid, ranh giới, địa danh của từng khu vực
-js/data.js      load + chuẩn hoá board/CSV, nội suy bicubic (không gian) và tuyến tính (thời gian)
-js/aqi.js       US EPA AQI từ nồng độ µg/m³ + bảng màu EPA
-js/map.js       slippy map trên canvas (d3-zoom): tile CARTO, field AQI, isoline, path, origin
-js/wind.js      hạt gió chuyển động
-js/panel.js     panel chi tiết, chart AQI theo thời gian, legend, tooltip
-js/timeline.js  thanh thời gian: play, kéo thả, vùng forecast
-js/demo.js      dữ liệu demo (cùng format với backend; Kern + LA/OC có mô hình riêng)
+js/config.js    settings (the file you edit)
+js/regions.js   areas: grids, places, rankings
+js/strings.js   all UI text
+js/foryou.js    health profile, saved places, best time, alerts
+js/data.js      load + normalise boards/CSV, bicubic & time interpolation
+js/aqi.js       US EPA AQI from µg/m³ + EPA colours
+js/map.js       canvas slippy map: tiles, AQI field, isolines, path, markers
+js/wind.js      wind particles
+js/panel.js     side panel, chart, legend, tooltip
+js/timeline.js  timeline scrubber
+js/demo.js      demo data in the backend's format (one model per area)
+js/store.js     safe localStorage wrapper
 ```
 
-## Lưu ý về số liệu
+## Data notes
 
-- Field `aqi` của OpenWeather là **thang 1–5**, không phải US AQI. App tự tính US AQI từ nồng độ theo breakpoint của EPA (PM2.5 dùng bản sửa đổi 2024), rồi lấy max của các sub-index.
-- EPA quy định thời gian lấy trung bình riêng cho từng chất (24 h cho PM, 8 h cho O₃ và CO, 1 h cho NO₂ và SO₂). App áp các breakpoint đó lên trung bình 6 giờ của backend, nên trong báo cáo nên ghi rõ điều này.
-- NO không có chỉ số AQI nên được hiển thị bằng nồng độ thô.
+- OpenWeather's `aqi` field is its own **1–5 scale**. The app computes the real US AQI from pollutant concentrations using EPA breakpoints (PM2.5 uses the 2024 revision), then takes the highest sub-index.
+- The EPA breakpoints assume specific averaging periods: 24 h for PM, 8 h for O₃ and CO, 1 h for NO₂ and SO₂. The app applies them to the backend's 6-hour means, so say so in the report.
+- Kern's county outline is approximate. Drop an official TIGER/Line GeoJSON at `data/kern.geojson` to replace it. City areas have no outline.
+- The app's guidance is not medical advice, and the panel footer says so.

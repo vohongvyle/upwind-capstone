@@ -7,7 +7,7 @@ import { mean } from './data.js';
 import { category, CATEGORIES } from './aqi.js';
 import { describePlace } from './geo.js';
 import { store } from './store.js';
-import { t, catName, fmtTime } from './i18n.js';
+import { t, catName, fmtTime } from './strings.js';
 
 // AQI above `avoid` → avoid outdoor activity; at or below `ok` → fine.
 export const PROFILES = {

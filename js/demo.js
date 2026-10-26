@@ -4,11 +4,10 @@
 //  so the real parsing path is exercised. Synthetic but plausible:
 //   Kern   — valley-floor PM near Bakersfield, afternoon ozone in the
 //            SE foothills, NW→SE valley flow, Tehachapi pass jet.
-//   LA/OC  — port + freeway NO₂/PM, afternoon sea breeze pushing
-//            ozone into the San Gabriel Valley / Inland Empire edge,
-//            night land breeze, one Santa Ana (offshore) episode.
+//   Visalia / Fresno — same valley dynamics as Kern.
+//   San Diego — port + border crossings, afternoon sea breeze ozone inland.
+//   El Centro — Mexicali emissions, ag burning, Salton Sea / desert dust.
 // ─────────────────────────────────────────────────────────────
-import { inRing } from './geo.js';
 
 function hash(x, y, z) {
   const h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
@@ -21,7 +20,6 @@ function noise(x, y, z) {
   return (a + (b - a) * s(xf)) * (1 - s(yf)) + (c + (d - c) * s(xf)) * s(yf);
 }
 const g = (lon, lat, cx, cy, r) => Math.exp(-(((lon - cx) / r) ** 2 + ((lat - cy) / (r * 0.8)) ** 2));
-const clamp01 = v => Math.max(0, Math.min(1, v));
 
 // ── Kern County ──────────────────────────────────────────────
 const KERN = {
@@ -63,54 +61,77 @@ const KERN = {
   },
 };
 
-// ── Los Angeles & Orange ─────────────────────────────────────
-function laocModel(region) {
-  const rings = region.outlines.map(o => o.ring);
-  const isLand = (lon, lat) => rings.some(r => inRing(lon, lat, r))
-    || (lon > -117.68 && lat > 33.45)              // Riverside / San Bernardino
-    || (lon < -118.85 && lat > 34.05);             // Ventura
-  // Santa Ana offshore event peaking ~36 h into the window
-  const santaAna = h => Math.exp(-(((h - 36) / 11) ** 2));
+// ── Generic city model ───────────────────────────────────────
+// sources: [lon, lat, radius°, strength]; wind: daytime / night (u, v) m/s
+function cityModel(cfg) {
   return {
     wind(lon, lat, h) {
       const hod = h % 24;
-      const breeze = hod === 12 ? 1 : hod === 18 ? 0.75 : hod === 6 ? -0.25 : -0.45; // + onshore, − land breeze
-      const coastal = clamp01(1.4 - (lat - 33.7) * 1.2);                          // weaker far inland
-      let u = 2.0 * breeze * (0.5 + 0.5 * coastal), v = 1.5 * breeze * (0.5 + 0.5 * coastal);
-      if (lat > 34.35) { u *= 0.4; v = v * 0.3 + 0.4; }                           // San Gabriels / high desert
-      const sa = santaAna(h);
-      u = u * (1 - sa) - 4.2 * sa; v = v * (1 - sa) - 3.0 * sa;                   // NE → SW offshore
-      u += (noise(lon * 3, lat * 3, h / 6) - 0.5) * 0.7;
-      v += (noise(lon * 3 + 9, lat * 3, h / 6) - 0.5) * 0.7;
+      const day = hod === 12 ? 1 : hod === 18 ? 0.8 : hod === 6 ? 0.3 : 0;
+      const syn = 0.5 * Math.sin(h / 70 * 2 * Math.PI);
+      let u = cfg.wind.day[0] * day + cfg.wind.night[0] * (1 - day);
+      let v = cfg.wind.day[1] * day + cfg.wind.night[1] * (1 - day);
+      const c = Math.cos(syn * 0.6), s = Math.sin(syn * 0.6);
+      [u, v] = [u * c - v * s, u * s + v * c];
+      u += (noise(lon * 3, lat * 3, h / 6) - 0.5) * 0.8;
+      v += (noise(lon * 3 + 9, lat * 3, h / 6) - 0.5) * 0.8;
       return [u, v];
     },
     pollution(lon, lat, h) {
       const hod = h % 24;
-      const night = hod < 9 ? 1.25 : hod < 12 ? 1.0 : 0.85;
-      const sun = hod === 12 ? 1 : hod === 18 ? 0.8 : hod === 6 ? 0.25 : 0.06;
-      const sa = santaAna(h);
-      const land = isLand(lon, lat) ? 1 : 0.45;
-      const episode = (1 + 0.5 * Math.sin(h / 50 * 2 * Math.PI)) * (1 - 0.45 * sa);
-      const port = g(lon, lat, -118.23, 33.75, 0.13);
-      const dtla = g(lon, lat, -118.24, 34.04, 0.17);
-      const i710 = Math.exp(-(((lon - (-118.17 - (lat - 33.9) * 0.15)) / 0.06) ** 2)) * (lat > 33.75 && lat < 34.1 ? 1 : 0);
-      const oc = g(lon, lat, -117.9, 33.78, 0.16);
-      const sgv = g(lon, lat, -117.85, 34.1, 0.28);
-      const inland = clamp01((lat - 33.75) * 1.6 + (lon + 118.4) * 0.45);
+      const night = hod < 9 ? 1.3 : hod < 12 ? 1.0 : 0.82;
+      const sun = hod === 12 ? 1 : hod === 18 ? 0.85 : hod === 6 ? 0.25 : 0.08;
+      const episode = 1 + 0.6 * Math.sin(h / 55 * 2 * Math.PI - 1) + 0.2 * Math.sin(h / 17);
       const n = noise(lon * 4, lat * 4, h / 12);
-      const pm2_5 = Math.max(2, (5 + 16 * port + 15 * dtla + 10 * i710 + 9 * oc) * night * episode * land * (0.85 + 0.3 * n));
+      let src = 0;
+      for (const [x, y, r, k] of cfg.sources) src += k * g(lon, lat, x, y, r);
+      const oz = g(lon, lat, cfg.ozone[0], cfg.ozone[1], cfg.ozone[2]);
+      const dust = cfg.dust ? cfg.dust(lon, lat) : 0;
+      const base = cfg.base ?? 6;
+      const pm2_5 = Math.max(2, (base + 24 * src * episode) * night * (cfg.landFn ? cfg.landFn(lon, lat) : 1) * (0.85 + 0.3 * n));
       return {
         pm2_5,
-        pm10: pm2_5 * 1.6 + 7 + 45 * sa * (0.5 + n) * land,                    // Santa Ana dust
-        o3: 50 + 60 * sun * (0.25 + 1.1 * sgv + 0.55 * inland) * episode + 8 * n,
-        no2: (8 + 48 * port + 42 * dtla + 26 * i710 + 22 * oc) * (hod === 12 ? 0.6 : 1.1) * land * (0.9 + 0.2 * n),
-        co: 230 + 380 * dtla * night + 220 * port + 120 * i710 + 40 * n,
-        no: (0.4 + 9 * dtla * (hod < 9 ? 1 : 0.25) + 5 * port + 3 * i710) * (0.8 + 0.4 * n),
-        so2: 0.8 + 9 * port + 1.2 * dtla + 0.5 * n,
+        pm10: pm2_5 * 1.6 + 8 + 30 * dust * (0.6 + n),
+        o3: 52 + cfg.ozoneAmp * sun * (0.35 + oz) * (0.8 + 0.3 * episode / 1.6) + 8 * n,
+        no2: (6 + 36 * src) * (hod === 12 ? 0.6 : 1.1) * (0.9 + 0.2 * n),
+        co: 220 + 330 * src * night + 30 * n,
+        no: (0.3 + 7 * src * (hod < 9 ? 1 : 0.25)) * (0.8 + 0.4 * n),
+        so2: 0.8 + (cfg.so2 ? cfg.so2(lon, lat) : 0) + 1.2 * src + 0.5 * n,
       };
     },
   };
 }
+
+const CITY_MODELS = {
+  // San Joaquin Valley: NW→SE valley flow, PM trapped on the valley floor, ozone piling up on the Sierra foothills
+  visalia: cityModel({
+    wind: { day: [1.6, -1.5], night: [0.6, -0.9] },
+    sources: [[-119.29, 36.33, 0.16, 1], [-119.35, 36.21, 0.12, 0.6], [-119.02, 36.07, 0.12, 0.5], [-119.36, 36.25, 0.06, 0.6]],
+    ozone: [-118.95, 36.3, 0.35], ozoneAmp: 105, base: 9,
+    landFn: (lon) => (lon > -118.95 ? 0.55 : 1),           // foothills / Sierra cleaner for PM
+  }),
+  fresno: cityModel({
+    wind: { day: [1.5, -1.6], night: [0.5, -0.8] },
+    sources: [[-119.79, 36.74, 0.18, 1.1], [-119.70, 36.83, 0.1, 0.5], [-120.06, 36.96, 0.1, 0.5], [-119.80, 36.6, 0.05, 0.6]],
+    ozone: [-119.5, 36.75, 0.35], ozoneAmp: 95, base: 8,
+    landFn: (lon, lat) => (lon > -119.45 && lat > 36.85 ? 0.55 : 1),
+  }),
+  // Coastal: afternoon sea breeze pushes ozone inland to El Cajon/Alpine; border crossings + port for NO₂/PM
+  sandiego: cityModel({
+    wind: { day: [2.2, 0.6], night: [-0.8, -0.3] },
+    sources: [[-117.15, 32.71, 0.1, 0.9], [-117.04, 32.52, 0.12, 1.1], [-116.97, 32.56, 0.06, 0.8], [-117.09, 32.68, 0.06, 0.5], [-117.09, 33.12, 0.08, 0.4]],
+    ozone: [-116.85, 32.85, 0.3], ozoneAmp: 85, base: 5,
+    landFn: (lon, lat) => (lon < -117.27 + (lat - 32.7) * -0.1 ? 0.45 : 1),   // ocean cleaner
+    so2: (lon, lat) => 5 * g(lon, lat, -117.14, 32.69, 0.06),                  // port / shipyards
+  }),
+  // Imperial Valley: Mexicali emissions, ag burning and desert dust; westerly afternoon winds
+  elcentro: cityModel({
+    wind: { day: [2.4, -0.4], night: [-0.4, 0.9] },
+    sources: [[-115.47, 32.62, 0.16, 1.4], [-115.56, 32.79, 0.08, 0.5], [-115.53, 32.98, 0.07, 0.4], [-115.50, 32.68, 0.05, 0.6]],
+    ozone: [-115.5, 32.75, 0.4], ozoneAmp: 90, base: 7,
+    dust: (lon, lat) => g(lon, lat, -115.85, 33.3, 0.25) + 0.6 * (lon < -115.8 ? 1 : 0),   // Salton Sea playa + desert
+  }),
+};
 
 // Trace a path the way the backend does: snap to neighbouring cells by wind direction.
 function trace(board, step) {
@@ -131,7 +152,7 @@ function trace(board, step) {
 }
 
 export function makeDemo(config, region) {
-  const model = region.id === 'laoc' ? laocModel(region) : KERN;
+  const model = CITY_MODELS[region.id] || KERN;
   const { lons, lats } = region.grid;
   const step = lons[1] - lons[0];
   const now = new Date();

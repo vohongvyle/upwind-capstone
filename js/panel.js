@@ -4,7 +4,7 @@
 import { POLLUTANTS, INDEXED, CATEGORIES, category } from './aqi.js';
 import { mean, sample } from './data.js';
 import { describePlace, haversine, bearing, compass, fmtLat, fmtLon } from './geo.js';
-import { t, catName, catShort, catAdvice, pollLong, dirLabel, fmtTime, locale } from './i18n.js';
+import { t, catName, catShort, catAdvice, pollLong, dirLabel, fmtTime, locale } from './strings.js';
 import { upcoming, bestWindow, incomingAlert, tip, getProfile } from './foryou.js';
 
 const $ = id => document.getElementById(id);
@@ -134,6 +134,22 @@ export class Panel {
     // trajectory
     this.renderPath(frame, B, g);
     this.renderForYou(ds, sel);
+    this.renderWhy(region);
+  }
+
+  /** National rankings from the ALA State of the Air 2026 report. */
+  renderWhy(region) {
+    if (this._why === region.id) return;
+    this._why = region.id;
+    const cell = (k, label) => {
+      const r = region.ranks[k];
+      const txt = r == null ? '—' : `#${r}${region.tie?.includes(k) ? '<small>tie</small>' : ''}`;
+      return `<div><b class="${r != null && r <= 5 ? 'top' : ''}">${txt}</b><span>${label}${r == null ? ' · ' + t('notRanked') : ''}</span></div>`;
+    };
+    $('why-body').innerHTML = `
+      <p class="why-head"><b>${region.name}</b> — ${region.headline}</p>
+      <div class="why-grid">${cell('ozone', t('rankOzone'))}${cell('short', t('rankShort'))}${cell('annual', t('rankAnnual'))}</div>
+      <p class="why-src">National rank among U.S. metro areas · <a href="https://www.lung.org/media/press-releases/fy26-sota-california" target="_blank" rel="noopener">American Lung Association, 2026</a></p>`;
   }
 
   /** Alert banner + best-time slots + tip. Always about "now → next 24 h", not the scrubbed time. */
