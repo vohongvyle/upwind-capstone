@@ -1,4 +1,4 @@
-# Upwind — where your air is coming from
+# Upwind: check where your air is coming from
 
 A static web front-end for the Borealis capstone backend. It shows air pollution across California's most polluted metro areas, traces where that pollution came from, and tells people when it's safe to be outside.
 
